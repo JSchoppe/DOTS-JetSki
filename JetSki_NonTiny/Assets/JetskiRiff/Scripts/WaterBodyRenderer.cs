@@ -18,6 +18,10 @@ public sealed class WaterBodyRenderer : MonoBehaviour
     private WaveSimulationJob waveSimJob;
     private JobHandle waveJobHandle;
     private Vector3[] waveJobOutput;
+    private NativeArray<Vector2> uvOperationArray;
+    private UVUpdateJob uvUpdateJob;
+    private JobHandle uvJobHandle;
+    private Vector2[] uvJobOutput;
     #endregion
     #region Inspector Fields
     [Header("Ambient Wave Parameters")]
@@ -99,12 +103,15 @@ public sealed class WaterBodyRenderer : MonoBehaviour
         // Allocate space for the wave simulation job.
         vertexOperationArray = new NativeArray<Vector3>(dynamicMesh.vertices, Allocator.Persistent);
         waveJobOutput = new Vector3[vertexOperationArray.Length];
+        // Allocate space for the uv updates job.
+        uvOperationArray = new NativeArray<Vector2>(dynamicMesh.uv, Allocator.Persistent);
+        uvJobOutput = new Vector2[uvOperationArray.Length];
     }
     #endregion
     #region Job Update Loop
     private void Update()
     {
-        // Start a new wave simulation job.
+        // Create a new wave simulation job.
         waveSimJob = new WaveSimulationJob()
         {
             localToWorld = transform.localToWorldMatrix,
@@ -115,14 +122,28 @@ public sealed class WaterBodyRenderer : MonoBehaviour
         };
         // Divide the task among multiple threads.
         waveJobHandle = waveSimJob.Schedule(vertexOperationArray.Length, 64);
+
+        // Create a new uv update job.
+        uvUpdateJob = new UVUpdateJob()
+        {
+            localToWorld = transform.localToWorldMatrix,
+            vertices = vertexOperationArray,
+            uvs = uvOperationArray
+        };
+        // Schedule to update the uvs after the vertices have been recalculated.
+        // TODO: could this be done at the same time? Since this only reads the vertices.
+        uvJobHandle = uvUpdateJob.Schedule(uvOperationArray.Length, 64, waveJobHandle);
     }
     private void LateUpdate()
     {
-        // Wait for the job to complete.
+        // Wait for all jobs to complete.
         waveJobHandle.Complete();
-        // Apply the new vertex heights to the mesh.
+        uvJobHandle.Complete();
+        // Apply the new data to the mesh.
         waveSimJob.vertices.CopyTo(waveJobOutput);
         dynamicMesh.vertices = waveJobOutput;
+        uvUpdateJob.uvs.CopyTo(uvJobOutput);
+        dynamicMesh.uv = uvJobOutput;
         // Update the lightning normals. TODO: See if this can be done manually as a job.
         dynamicMesh.RecalculateNormals();
     }
@@ -130,6 +151,7 @@ public sealed class WaterBodyRenderer : MonoBehaviour
     {
         // Manually dispose of unmanaged memory.
         vertexOperationArray.Dispose();
+        uvOperationArray.Dispose();
     }
     #endregion
     #region Wave Simulation Job
@@ -149,6 +171,26 @@ public sealed class WaterBodyRenderer : MonoBehaviour
             // Apply perlin noise relative to the spread factor.
             vertex.y = height * noise.snoise(new float2(global.x * spreadFactor + time, global.z * spreadFactor + time));
             vertices[i] = vertex;
+        }
+    }
+    #endregion
+    #region Update UVs Job
+    [BurstCompile]
+    private struct UVUpdateJob : IJobParallelFor
+    {
+        public NativeArray<Vector3> vertices;
+        public NativeArray<Vector2> uvs;
+        public Matrix4x4 localToWorld;
+        public void Execute(int i)
+        {
+            Vector3 vertex = vertices[i];
+            // Transform from mesh space to world space.
+            Vector3 global = localToWorld.MultiplyPoint3x4(vertex);
+            // Update UVs to correspond to world position.
+            Vector2 uv = uvs[i];
+            uv.x = global.x;
+            uv.y = global.z;
+            uvs[i] = uv;
         }
     }
     #endregion
