@@ -29,7 +29,7 @@ In this first batch of commits I explored the use the Jobs system to handle upda
 This fluid body follows the camera which means that it can be a fixed size of geometry (excellent for parallelization).
 In a future iteration I would like to explore mesh generation algorithms that place more detail near the camera. My first intuition
 would be to explore tiling strategies for triangles instead of quads. Something like this: <br>
-<img src="https://raw.githubusercontent.com/JSchoppe/DOTS-JetSki/master/ReadMeImages/tris-lod-generation.jpg" width="45%">
+<img src="https://raw.githubusercontent.com/JSchoppe/DOTS-JetSki/master/ReadMeImages/tris-lod-generation.jpg" width="45%"> <br>
 In addition to the fluid body I also implemented rock spire generation that renders using the hybrid renderer. These are procedurally
 generated and seeded based on their location in the scene. Some tools were made to ensure that the generation could be previewed in
 the scene. <br>
