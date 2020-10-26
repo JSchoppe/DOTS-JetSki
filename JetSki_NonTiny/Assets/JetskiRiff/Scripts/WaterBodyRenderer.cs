@@ -64,7 +64,7 @@ public sealed class WaterBodyRenderer : MonoBehaviour
         // Draw a preview of the mesh if the preview has generated.
         if (gizmosTris != null && gizmoVerts != null)
         {
-            Gizmos.color = Color.yellow;
+            Gizmos.color = Color.blue;
             for (int i = 0; i < gizmosTris.Length; i += 3)
             {
                 Vector3 a = transform.TransformPoint(gizmoVerts[gizmosTris[i]]);
