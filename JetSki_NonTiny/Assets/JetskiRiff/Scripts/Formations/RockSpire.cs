@@ -1,17 +1,11 @@
 ﻿using UnityEngine;
-using Unity.Entities;
-using Unity.Rendering;
-using Unity.Transforms;
-using Unity.Mathematics;
 
 /// <summary>
 /// A procedurally generated rock spire rendered as an entity.
 /// </summary>
-public sealed class RockSpire : MonoBehaviour, IValidateOnTransformChange
+public sealed class RockSpire : ProceduralStaticMesh, IValidateOnTransformChange
 {
     #region Inpsector Fields
-    [Tooltip("The material that will be used to render this rock spire.")]
-    [SerializeField] private Material renderMaterial = null;
     [Header("Generation Parameters")]
     [Tooltip("How many vertices exist in each ring loop.")]
     [SerializeField] private int ringSubdivisions = 4;
@@ -66,36 +60,16 @@ public sealed class RockSpire : MonoBehaviour, IValidateOnTransformChange
     }
     #endregion
 #endif
-
-    #region Entity Instantiation
-    private void Start()
+    #region Procedural Static Mesh Implementation
+    protected override Mesh Generate()
     {
-        // Generate the mesh for this spire.
-        Mesh spireMesh = new Mesh();
-        spireMesh.vertices = GenerateMeshVertices();
-        spireMesh.triangles = GenerateMeshTriangles();
-        spireMesh.uv = GenerateMeshUVs();
-        spireMesh.RecalculateNormals();
-
-        EntityManager manager = World.DefaultGameObjectInjectionWorld.EntityManager;
-        // TODO probably should abstract this archetype,
-        // will end up using it a lot.
-        EntityArchetype renderedArchetype = manager.CreateArchetype(
-            typeof(LocalToWorld), typeof(RenderMesh),
-            typeof(Translation), typeof(RenderBounds));
-        // Create the entity and apply its component values.
-        Entity newEntity = manager.CreateEntity(renderedArchetype);
-        manager.SetSharedComponentData(newEntity, new RenderMesh
-        {
-            mesh = spireMesh,
-            castShadows = UnityEngine.Rendering.ShadowCastingMode.On,
-            receiveShadows = true,
-            material = renderMaterial
-        });
-        manager.SetComponentData(newEntity, new Translation
-        {
-            Value = new float3(transform.position.x, transform.position.y, transform.position.z)
-        });
+        Mesh mesh = new Mesh();
+        mesh.vertices = GenerateMeshVertices();
+        mesh.triangles = GenerateMeshTriangles();
+        mesh.uv = GenerateMeshUVs();
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        return mesh;
     }
     #endregion
     #region Mesh Generation Functions TODO: Abstract this

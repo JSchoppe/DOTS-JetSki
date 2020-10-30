@@ -15,7 +15,7 @@ public interface IValidateOnTransformChange
 /// Editor class that calls OnValidate when a transform is updated.
 /// </summary>
 [ExecuteInEditMode]
-public sealed class TransformValidator : MonoBehaviour
+public class TransformValidator : MonoBehaviour
 {
     #region Private Fields
     private Matrix4x4 priorMatrix = Matrix4x4.identity;
@@ -25,7 +25,7 @@ public sealed class TransformValidator : MonoBehaviour
     [SerializeField] private bool liveUpdate = false;
     #endregion
     #region Editor Update Loop
-    private void Update()
+    protected virtual void Update()
     {
         // If we are in play mode, destroy this!
         if (Application.isPlaying)
