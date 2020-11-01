@@ -27,11 +27,7 @@ public class TransformValidator : MonoBehaviour
     #region Editor Update Loop
     protected virtual void Update()
     {
-        // If we are in play mode, destroy this!
-        if (Application.isPlaying)
-            Destroy(this);
-        // Otherwise check for a transform change.
-        else if (liveUpdate)
+        if (liveUpdate)
         {
             if (!transform.worldToLocalMatrix.Equals(priorMatrix))
             {

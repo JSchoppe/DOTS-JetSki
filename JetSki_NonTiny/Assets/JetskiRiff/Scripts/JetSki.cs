@@ -4,6 +4,9 @@ using UnityEngine;
 
 public sealed class JetSki : MonoBehaviour
 {
+
+    [SerializeField] private Transform cameraRig = null;
+
     [SerializeField] private WaterBodyRenderer fluid = null;
 
     [SerializeField] private float bouyancyForce = 1f;
@@ -40,9 +43,9 @@ public sealed class JetSki : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        fluid.transform.position = new Vector3(transform.position.x - transform.forward.x * 5, 0f, transform.position.z - transform.forward.z * 5);
+        cameraRig.transform.position = new Vector3(transform.position.x - transform.forward.x * 5, 0f, transform.position.z - transform.forward.z * 5);
 
-        fluid.transform.LookAt(new Vector3(transform.position.x, 0f, transform.position.z));
+        cameraRig.transform.LookAt(new Vector3(transform.position.x, 0f, transform.position.z));
 
 
         foreach (Ray hullPoint in hullPoints)
