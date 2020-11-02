@@ -13,6 +13,34 @@ Through the use of Jobs and the Entity Component System I plan to explore the co
 
 ## Development Logs
 <details>
+<summary>Beaches and Fish | 11/1/2020<br><img src="https://github.com/JSchoppe/DOTS-JetSki/blob/master/ReadMeImages/fish-explosion.gif?raw=true" width="45%"></summary>
+
+### Notable Commits
+ - [abstracts ECS from rock spire, fixes render bounds generation](https://github.com/JSchoppe/DOTS-JetSki/commit/95cfd84daf93374e908e4b16692822355cac87fa)
+ - [abstracts plane mesh generation into helper class](https://github.com/JSchoppe/DOTS-JetSki/commit/5514c7fc1ebb37a550a5ab538fe77effd69131f8)
+ - [implements basic fish component system](https://github.com/JSchoppe/DOTS-JetSki/commit/54fdfa4e51c3442091dbdf31ac1a67605e745c36)
+ 
+### Overview
+In this update better OOP was implemented to seperate the water simulation from general noise landscapes. This is reflected with ground layer in the scene.
+The new abstracted class uses octaves to further define the noise generation. Plane generation has also been asbtracted into a helper class. The second
+addition in this update is a rough implementation of a fish behavior system. Initially I wanted it to communicate directly with the water elevation but I
+think this will require me rethink how the fluid object interfaces with the fish system. The added fish behavior uses some random parameters to define
+target directions per each fish.
+
+### TODO
+Some things I would like to address now:
+ - Procedural landscapes do not reflect fine perlin noise well (snap the following grid to the nearest grid unit)
+ - Determine how the fish can effectively poll the water level from within the system
+ - Add behavior for fish to jump out of the water every so often
+ - Add torus generation and deformation to create rock arches in the scene<br>
+
+Some things I would like to address but might defer for now:
+ - Instantiate the procedural meshes during runtime (load and unload them based on coordinates)
+ - Have fish targeting follow the player explicitly (stay within the range of the player)
+ - Have fish targeting acknowledge elevation
+
+</details>
+<details>
 <summary>Waves and Spires | 10/25/2020<br><img src="https://github.com/JSchoppe/DOTS-JetSki/blob/master/ReadMeImages/hello-spires.gif?raw=true" width="45%"></summary>
 
 ### Notable Commits
