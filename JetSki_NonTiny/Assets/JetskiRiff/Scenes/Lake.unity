@@ -605,6 +605,7 @@ MonoBehaviour:
   scale: {x: 0.9, y: 1.1}
   speed: {x: 3, y: 7}
   wander: {x: 4, y: 10}
+  waterBody: {fileID: 2006482122}
 --- !u!4 &1105233577
 Transform:
   m_ObjectHideFlags: 0

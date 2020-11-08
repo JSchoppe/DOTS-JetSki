@@ -23,6 +23,10 @@ public struct FishComponent : IComponentData
     /// </summary>
     public float3 scale;
     /// <summary>
+    /// The fish height relatiev to the wave height.
+    /// </summary>
+    public float waveElevation;
+    /// <summary>
     /// Controls how far a fish will travel before changing directions.
     /// </summary>
     public float wanderMagnitude;

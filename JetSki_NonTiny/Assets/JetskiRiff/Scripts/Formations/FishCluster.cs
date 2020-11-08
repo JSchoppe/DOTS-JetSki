@@ -20,6 +20,7 @@ public sealed class FishCluster : MonoBehaviour
     [SerializeField] private Vector2 speed = new Vector2(0.7f, 1.5f);
     [Tooltip("The distance of random travel for each behavior step.")]
     [SerializeField] private Vector2 wander = new Vector2(4f, 6f);
+    [SerializeField] private WaterBodyRenderer waterBody = null;
     #endregion
 #if DEBUG
     #region Editor Functions
@@ -40,6 +41,9 @@ public sealed class FishCluster : MonoBehaviour
     #region Entity Instantiation
     public void Start()
     {
+        // Retrieve the component data from the water body.
+        WaveComponent waveComponent = waterBody.WaveComponent;
+
         // Retrieve the entity manager.
         EntityManager manager = World.DefaultGameObjectInjectionWorld.EntityManager;
         // Populate fish into the scene.
@@ -76,6 +80,8 @@ public sealed class FishCluster : MonoBehaviour
                 scale = Mathf.Lerp(scale.x, scale.y, UnityEngine.Random.value),
                 wanderMagnitude = Mathf.Lerp(wander.x, wander.y, UnityEngine.Random.value)
             });
+            // Tie the shared component data for the waves to each fish.
+            manager.AddSharedComponentData(newFish, waveComponent);
         }
         Destroy(gameObject);
     }

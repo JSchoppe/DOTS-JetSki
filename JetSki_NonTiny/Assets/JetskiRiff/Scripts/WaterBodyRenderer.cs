@@ -12,6 +12,7 @@ public sealed class WaterBodyRenderer : NoisyPlane
 {
     #region Private Fields
     private WaveSimulationJob waveSimJob;
+    private WaveComponent waveComponent;
     #endregion
     #region Inspector Fields
     [Header("Ambient Wave Parameters")]
@@ -21,6 +22,27 @@ public sealed class WaterBodyRenderer : NoisyPlane
     [SerializeField] private float ambientFlowSpread = 1f;
     [Tooltip("The max height of natural wave peaks.")]
     [SerializeField] private float ambientFlowHeight = 1f;
+    #endregion
+    #region Properties
+    /// <summary>
+    /// An ECS component that encapsulates this
+    /// fluid body's ambient wave parameters.
+    /// </summary>
+    public WaveComponent WaveComponent
+    {
+        // This accessor is slow, and is not meant
+        // to be constantly accessed. It is safe from
+        // script order errors.
+        get
+        {
+            return new WaveComponent
+            {
+                ambientFlowHeight = ambientFlowHeight,
+                ambientFlowSpeed = ambientFlowSpeed,
+                ambientFlowSpread = ambientFlowSpread
+            };
+        }
+    }
     #endregion
 #if DEBUG
     #region Editor Functions
@@ -41,6 +63,13 @@ public sealed class WaterBodyRenderer : NoisyPlane
     }
     #endregion
 #endif
+    #region Initialization
+    protected override void Start()
+    {
+        base.Start();
+        waveComponent = WaveComponent;
+    }
+    #endregion
     #region Job Cycle
     private void Update()
     {
@@ -48,10 +77,9 @@ public sealed class WaterBodyRenderer : NoisyPlane
         waveSimJob = new WaveSimulationJob()
         {
             localToWorld = transform.localToWorldMatrix,
-            spreadFactor = ambientFlowSpread,
             vertices = vertexOperationArray,
-            time = Time.time * ambientFlowSpeed,
-            height = ambientFlowHeight
+            scaledTime = Time.time * ambientFlowSpeed,
+            wave = waveComponent
         };
         // Divide the task among multiple threads.
         verticesJobHandle = waveSimJob.Schedule(vertexOperationArray.Length, 64);
@@ -87,16 +115,15 @@ public sealed class WaterBodyRenderer : NoisyPlane
     {
         public NativeArray<Vector3> vertices;
         [ReadOnly] public Matrix4x4 localToWorld;
-        [ReadOnly] public float time;
-        [ReadOnly] public float spreadFactor;
-        [ReadOnly] public float height;
+        [ReadOnly] public WaveComponent wave;
+        [ReadOnly] public float scaledTime;
         public void Execute(int i)
         {
             Vector3 vertex = vertices[i];
             // Transform from mesh space to world space.
             Vector3 global = localToWorld.MultiplyPoint(vertex);
             // Apply perlin noise relative to the spread factor.
-            vertex.y = height * noise.snoise(new float2(global.x * spreadFactor + time, global.z * spreadFactor + time));
+            vertex.y = wave.WaveHeightAt(new float2(global.x, global.z), scaledTime);
             vertices[i] = vertex;
         }
     }
@@ -111,6 +138,7 @@ public sealed class WaterBodyRenderer : NoisyPlane
     {
         // Important that this matches how it is done by the job.
         float time = Time.time * ambientFlowSpeed;
+
         return ambientFlowHeight * noise.snoise(new float2
         {
             x = location.x * ambientFlowSpread + time,

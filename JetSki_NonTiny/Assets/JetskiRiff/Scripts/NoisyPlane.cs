@@ -88,7 +88,7 @@ public abstract class NoisyPlane : MonoBehaviour, IValidateOnTransformChange
     #endregion
 #endif
     #region Mesh and Jobs Initialization
-    protected void Start()
+    protected virtual void Start()
     {
         // Create a new plane for our perlin noise to populate.
         dynamicMesh = MeshHelper.GenerateQuadGrid(detailLevel, new PlaneDefinition
