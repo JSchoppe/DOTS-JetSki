@@ -138,12 +138,7 @@ public sealed class WaterBodyRenderer : NoisyPlane
     {
         // Important that this matches how it is done by the job.
         float time = Time.time * ambientFlowSpeed;
-
-        return ambientFlowHeight * noise.snoise(new float2
-        {
-            x = location.x * ambientFlowSpread + time,
-            y = location.y * ambientFlowSpread + time
-        });
+        return waveComponent.WaveHeightAt(location, time);
     }
     #endregion
 }

@@ -424,7 +424,7 @@ GameObject:
   m_Component:
   - component: {fileID: 946340310}
   m_Layer: 0
-  m_Name: Propellent
+  m_Name: Propeller
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -911,13 +911,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b5f413ff623f3ca49a8891a559d1a5e5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cameraRig: {fileID: 830740882}
-  fluid: {fileID: 2006482122}
-  bouyancyForce: 0.2
   body: {fileID: 1934605549}
-  accelerationForce: 200
-  accelerationVector: {fileID: 946340310}
+  fluid: {fileID: 2006482122}
   bouyancyHull: {fileID: 359443855}
+  accelerationDirection: {fileID: 946340310}
+  cameraRig: {fileID: 830740882}
+  bouyancyForce: 0.2
+  accelerationForce: 200
+  torqueForce: 3
 --- !u!54 &1934605549
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -998,7 +999,7 @@ MonoBehaviour:
   detailLevel: 1
   uvMapScale: 1
   wireframeColor: {r: 1, g: 1, b: 1, a: 1}
-  ambientFlowSpeed: 0
+  ambientFlowSpeed: 0.1
   ambientFlowSpread: 0.04
   ambientFlowHeight: 1
 --- !u!23 &2006482123
