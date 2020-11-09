@@ -20,6 +20,8 @@ public sealed class FishCluster : MonoBehaviour
     [SerializeField] private Vector2 speed = new Vector2(0.7f, 1.5f);
     [Tooltip("The distance of random travel for each behavior step.")]
     [SerializeField] private Vector2 wander = new Vector2(4f, 6f);
+    [Tooltip("The vertical distance that a fish can travel from the surface.")]
+    [SerializeField] private Vector2 depthWander = new Vector2(0f, 3f);
     [SerializeField] private WaterBodyRenderer waterBody = null;
     #endregion
 #if DEBUG
@@ -78,10 +80,11 @@ public sealed class FishCluster : MonoBehaviour
             {
                 speed = Mathf.Lerp(speed.x, speed.y, UnityEngine.Random.value),
                 scale = Mathf.Lerp(scale.x, scale.y, UnityEngine.Random.value),
-                wanderMagnitude = Mathf.Lerp(wander.x, wander.y, UnityEngine.Random.value)
+                wanderMagnitude = Mathf.Lerp(wander.x, wander.y, UnityEngine.Random.value),
+                depthWanderMagnitude = Mathf.Lerp(depthWander.x, depthWander.y, UnityEngine.Random.value)
             });
             // Tie the shared component data for the waves to each fish.
-            manager.AddSharedComponentData(newFish, waveComponent);
+            manager.AddComponentData(newFish, waveComponent);
         }
         Destroy(gameObject);
     }

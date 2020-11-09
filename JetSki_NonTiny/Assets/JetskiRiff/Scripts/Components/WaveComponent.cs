@@ -1,13 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using UnityEngine;
-using Unity.Entities;
+﻿using Unity.Entities;
 using Unity.Mathematics;
 
 /// <summary>
 /// Component for entities that calculate ambient waves.
 /// </summary>
-public struct WaveComponent : ISharedComponentData
+public struct WaveComponent : IComponentData
 {
     #region Component Fields
     /// <summary>

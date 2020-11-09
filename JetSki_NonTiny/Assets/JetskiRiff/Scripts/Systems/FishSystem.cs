@@ -17,24 +17,23 @@ public sealed class FishSystem : SystemBase
         Entities.ForEach((ref LocalToWorld localToWorld, ref FishComponent fish, in WaveComponent wave) =>
         {
             float time = t * wave.ambientFlowSpeed;
-            float waveHeight = wave.ambientFlowHeight * noise.snoise(new float2
-            {
-                x = localToWorld.Position.x * wave.ambientFlowSpread + time,
-                y = localToWorld.Position.z * wave.ambientFlowSpread + time
-            });
-            /*
-            float waveHeight = wave.WaveHeightAt(localToWorld.Position, ref time);
-            */
+            float waveHeight = wave.WaveHeightAt(localToWorld.Position.TrimY(), time);
+
+            fish.depth = ((noise.snoise(new float2(time, 0f)) + 1f) / 2f) * fish.depthWanderMagnitude;
 
             float3 heightAdjustedPosition = new float3
             {
                 x = localToWorld.Position.x,
-                y = waveHeight,
+                y = waveHeight - fish.depth,
                 z = localToWorld.Position.z
             };
 
             // Get the direction to the current target.
-            float3 direction = math.normalize(fish.target - heightAdjustedPosition);
+            float3 direction = math.normalize(new float3
+            {
+                x = fish.target.x - heightAdjustedPosition.x,
+                z = fish.target.z - heightAdjustedPosition.z,
+            });
             // Apply the new matrix data to the fish.
             localToWorld = new LocalToWorld
             {
@@ -49,7 +48,7 @@ public sealed class FishSystem : SystemBase
 
             // If the fish is within a certain distance of the target
             // then recalculate a new target.
-            if (math.distancesq(localToWorld.Position, fish.target) < 1f)
+            if (math.distancesq(localToWorld.Position.TrimY(), fish.target.TrimY()) < 1f)
             {
                 float3 target = fish.target;
                 target += new float3
@@ -60,6 +59,6 @@ public sealed class FishSystem : SystemBase
                 };
                 fish.target = target;
             }
-        }).WithoutBurst().Run();
+        }).ScheduleParallel();
     }
 }

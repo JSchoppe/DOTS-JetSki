@@ -30,4 +30,8 @@ public struct FishComponent : IComponentData
     /// Controls how far a fish will travel before changing directions.
     /// </summary>
     public float wanderMagnitude;
+    /// <summary>
+    /// Controls how far a fish will wander vertically from the water surface.
+    /// </summary>
+    public float depthWanderMagnitude;
 }
