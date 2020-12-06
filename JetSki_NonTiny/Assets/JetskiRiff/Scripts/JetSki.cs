@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using Unity.Mathematics;
 
 /// <summary>
 /// Controller for the JetSki hull.
@@ -113,6 +114,14 @@ public sealed class JetSki : MonoBehaviour
                     ForceMode.Impulse
                 );
             }
+        }
+
+        if (body.velocity.magnitude > 2f)
+        {
+            fluid.AddWave(
+                new WaveForce(((float3)(transform.position + body.velocity.normalized)).TrimY()
+                , Time.time, 0.02f * body.velocity.magnitude, 0.05f)
+            );
         }
     }
     #endregion

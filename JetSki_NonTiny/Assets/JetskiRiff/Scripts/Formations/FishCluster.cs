@@ -3,6 +3,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Rendering;
 using Unity.Transforms;
+using System.Collections;
 
 /// <summary>
 /// Creates a cluster of fish actors at a given location.
@@ -24,7 +25,6 @@ public sealed class FishCluster : MonoBehaviour
     [SerializeField] private Vector2 depthWander = new Vector2(0f, 3f);
     [SerializeField] private WaterBodyRenderer waterBody = null;
     #endregion
-#if DEBUG
     #region Editor Functions
     private void OnValidate()
     {
@@ -39,9 +39,20 @@ public sealed class FishCluster : MonoBehaviour
             wander.y = wander.x;
     }
     #endregion
-#endif
     #region Entity Instantiation
-    public void Start()
+    private void Start()
+    {
+        SpawnSomeDamnFish();
+        StartCoroutine(SpawnSomeDamnFishAfterAFrickinWhile());
+    }
+
+    private IEnumerator SpawnSomeDamnFishAfterAFrickinWhile()
+    {
+        yield return new WaitForSeconds(5f);
+        SpawnSomeDamnFish();
+    }
+
+    public void SpawnSomeDamnFish()
     {
         // Retrieve the component data from the water body.
         WaveComponent waveComponent = waterBody.WaveComponent;
@@ -61,12 +72,7 @@ public sealed class FishCluster : MonoBehaviour
             });
             manager.AddComponentData(newFish, new Translation
             {
-                Value = new float3
-                {
-                    x = transform.position.x,
-                    y = transform.position.y,
-                    z = transform.position.z
-                }
+                Value = transform.localPosition
             });
             manager.AddComponentData(newFish, new LocalToWorld
             {
@@ -86,7 +92,7 @@ public sealed class FishCluster : MonoBehaviour
             // Tie the shared component data for the waves to each fish.
             manager.AddComponentData(newFish, waveComponent);
         }
-        Destroy(gameObject);
     }
+
     #endregion
 }

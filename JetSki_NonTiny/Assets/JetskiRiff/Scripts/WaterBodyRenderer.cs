@@ -4,6 +4,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
+using System.Collections.Generic;
 
 /// <summary>
 /// Renders a dynamic body of water in a specific region.
@@ -13,6 +14,8 @@ public sealed class WaterBodyRenderer : NoisyPlane
     #region Private Fields
     private WaveSimulationJob waveSimJob;
     private WaveComponent waveComponent;
+    private List<WaveForce> forces;
+    private NativeArray<WaveForce> forcesArray;
     #endregion
     #region Inspector Fields
     [Header("Ambient Wave Parameters")]
@@ -44,7 +47,6 @@ public sealed class WaterBodyRenderer : NoisyPlane
         }
     }
     #endregion
-#if DEBUG
     #region Editor Functions
     public override void OnValidate()
     {
@@ -62,24 +64,35 @@ public sealed class WaterBodyRenderer : NoisyPlane
         }
     }
     #endregion
-#endif
     #region Initialization
     protected override void Start()
     {
         base.Start();
         waveComponent = WaveComponent;
+        forces = new List<WaveForce>();
     }
     #endregion
     #region Job Cycle
     private void Update()
     {
+        // TODO Make this better.
+        List<WaveForce> expiredWaves = new List<WaveForce>();
+        foreach (WaveForce force in forces)
+            if (force.baseMagnitude - ((Time.time - force.startTime) * force.fallOff) < 0f)
+                expiredWaves.Add(force);
+        for (int i = 0; i < expiredWaves.Count; i++)
+            forces.Remove(expiredWaves[i]);
+        forcesArray = new NativeArray<WaveForce>(forces.ToArray(), Allocator.TempJob);
+
         // Create a new wave simulation job.
         waveSimJob = new WaveSimulationJob()
         {
             localToWorld = transform.localToWorldMatrix,
             vertices = vertexOperationArray,
             scaledTime = Time.time * ambientFlowSpeed,
-            wave = waveComponent
+            time = Time.time,
+            wave = waveComponent,
+            forces = forcesArray
         };
         // Divide the task among multiple threads.
         verticesJobHandle = waveSimJob.Schedule(vertexOperationArray.Length, 64);
@@ -107,6 +120,8 @@ public sealed class WaterBodyRenderer : NoisyPlane
         dynamicMesh.uv = uvJobOutput;
         // Update the lightning normals. TODO: See if this can be done manually as a job.
         dynamicMesh.RecalculateNormals();
+
+        forcesArray.Dispose();
     }
     #endregion
     #region Wave Simulation Job
@@ -117,6 +132,9 @@ public sealed class WaterBodyRenderer : NoisyPlane
         [ReadOnly] public Matrix4x4 localToWorld;
         [ReadOnly] public WaveComponent wave;
         [ReadOnly] public float scaledTime;
+        [ReadOnly] public float time;
+        [ReadOnly] public NativeArray<WaveForce> forces;
+
         public void Execute(int i)
         {
             Vector3 vertex = vertices[i];
@@ -124,6 +142,22 @@ public sealed class WaterBodyRenderer : NoisyPlane
             Vector3 global = localToWorld.MultiplyPoint(vertex);
             // Apply perlin noise relative to the spread factor.
             vertex.y = wave.WaveHeightAt(new float2(global.x, global.z), scaledTime);
+
+            // Apply elevations from waves.
+            for (int j = 0; j < forces.Length; j++)
+            {
+                float waveDistance = time - forces[j].startTime;
+                float waveHeight = forces[j].baseMagnitude - (waveDistance * forces[j].fallOff);
+                float waveWidth = waveDistance / 2f;
+
+                float distance = Vector2.Distance(new Vector2(global.x, global.z), forces[j].origin);
+                float localDist = Mathf.Abs(distance - waveDistance) / (0.5f * waveWidth);
+                if (localDist < Mathf.PI)
+                {
+                    vertex.y += 0.5f * waveHeight * (Mathf.Sin(localDist + Mathf.PI * 0.5f) + 1f);
+                }
+            }
+
             vertices[i] = vertex;
         }
     }
@@ -141,4 +175,9 @@ public sealed class WaterBodyRenderer : NoisyPlane
         return waveComponent.WaveHeightAt(location, time);
     }
     #endregion
+
+    public void AddWave(WaveForce force)
+    {
+        forces.Add(force);
+    }
 }
