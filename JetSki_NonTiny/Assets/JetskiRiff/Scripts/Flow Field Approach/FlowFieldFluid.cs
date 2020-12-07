@@ -10,44 +10,39 @@ public sealed class FlowFieldFluid : MonoBehaviour
     {
         public float2 location;
         public int2 coordinate;
-        public float2 flowDirection;
         public float height;
-        public float entropyAngle;
-        public float entropyMagnitude;
     }
 
-    [SerializeField] private float waveMagnitude = 1f;
-    [SerializeField] private float deltaEntropyAngle = 0.3f;
-    [SerializeField] private float deltaEntropyMagnitude = 0.1f;
-    [SerializeField] private float maxEntropyMagnitude = 1f;
-    [SerializeField] private float deltaFlowDecay = 0.1f;
+    private struct FlowOver
+    {
+        public float left;
+        public float right;
+        public float top;
+        public float bottom;
+    }
+
+
     [SerializeField] private int fieldSize = 2;
     [SerializeField] private float fieldStep = 1f;
-    [SerializeField] private float neighborInfluence = 1f;
+    [SerializeField] private float spreadRate = 1f;
+    [SerializeField] private float noiseIntensity = 1f;
+    [SerializeField] private float heightStep = 1f;
 
     private void OnValidate()
     {
-        if (waveMagnitude < 0f)
-            waveMagnitude = 0f;
-        if (deltaEntropyAngle < 0f)
-            deltaEntropyAngle = 0f;
-        if (deltaEntropyMagnitude < 0f)
-            deltaEntropyMagnitude = 0f;
-        if (maxEntropyMagnitude < 0f)
-            maxEntropyMagnitude = 0f;
-        if (deltaFlowDecay < 0f)
-            deltaFlowDecay = 0f;
+        if (noiseIntensity < 0f)
+            noiseIntensity = 0f;
         if (fieldSize < 2)
             fieldSize = 2;
         if (fieldStep < 0.005f)
             fieldStep = 0.005f;
-        if (neighborInfluence < 0f)
-            neighborInfluence = 0f;
+        if (spreadRate < 0f)
+            spreadRate = 0f;
     }
 
     // private Vector2 currentOrigin;
     private NativeArray<FieldNode> fieldNodes;
-    private NativeArray<float2> influenceOutput;
+    private NativeArray<float> influenceOutput;
     private NativeArray<float> heightOutput;
 
     private NativeArray<Vector3> vertexOperationArray;
@@ -63,6 +58,13 @@ public sealed class FlowFieldFluid : MonoBehaviour
 
     private void Awake()
     {
+        float[] startingHeights = new float[fieldSize * fieldSize];
+        for (int i = 0; i < startingHeights.Length - 1; i += 2)
+        {
+            startingHeights[i] = UnityEngine.Random.value * noiseIntensity;
+            startingHeights[i + 1] = -startingHeights[i];
+        }
+
         // Generate the flow field nodes.
         // Get the starting corner to iterate from.
         float2 startingCorner = new float2
@@ -83,14 +85,13 @@ public sealed class FlowFieldFluid : MonoBehaviour
                         y = y * fieldStep
                     },
                     // By default the fluid is still.
-                    height = 0f,
-                    flowDirection = float2.zero
+                    height = startingHeights[y * fieldSize + x]
                 };
         // Make the nodes accessible to jobs.
         fieldNodes = new NativeArray<FieldNode>(nodes, Allocator.Persistent);
         // TODO test whether it is faster to have these persistent
         // or declared every loop for the temp job.
-        influenceOutput = new NativeArray<float2>(nodes.Length, Allocator.Persistent);
+        influenceOutput = new NativeArray<float>(nodes.Length, Allocator.Persistent);
         heightOutput = new NativeArray<float>(nodes.Length, Allocator.Persistent);
 
         // Create a new plane for our waves to populate.
@@ -121,35 +122,37 @@ public sealed class FlowFieldFluid : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            FieldNode node = fieldNodes[0];
-            node.flowDirection = new float2(2, 2);
-            fieldNodes[0] = node;
+            int centerIndex = fieldSize * (fieldSize / 2) + (fieldSize / 2);
+            for (int i = -9; i < 10; i++)
+            {
+                FieldNode node = fieldNodes[centerIndex + i];
+                node.height = 95f;
+                fieldNodes[centerIndex + i] = node;
+            }
         }
 
         UpdateEntropyJob entropyJob = new UpdateEntropyJob
         {
             random = new Unity.Mathematics.Random((uint)UnityEngine.Random.Range(0, int.MaxValue)),
             deltaTime = Time.deltaTime,
-            nodes = fieldNodes,
-            deltaEntropyAngle = deltaEntropyAngle,
-            deltaEntropyMagnitude = deltaEntropyMagnitude,
-            maxEntropyMagnitude = maxEntropyMagnitude
+            nodes = fieldNodes
         };
-        NeighborInfluenceJob neighborJob = new NeighborInfluenceJob
+        NeighborEnergyJob neighborJob = new NeighborEnergyJob
         {
             deltaTime = Time.deltaTime,
             size = fieldSize,
-            neighborFactor = neighborInfluence,
+            neighborFactor = spreadRate,
             nodes = fieldNodes,
             influences = influenceOutput
         };
         ApplyFlowJob applyFlowJob = new ApplyFlowJob
         {
             influence = influenceOutput,
-            decay = deltaFlowDecay,
+            neighborFactor = spreadRate,
             deltaTime = Time.deltaTime,
             nodes = fieldNodes
         };
+        /*
         CalculateHeightJob calculateHeightJob = new CalculateHeightJob
         {
             size = fieldSize,
@@ -157,24 +160,24 @@ public sealed class FlowFieldFluid : MonoBehaviour
             nodes = fieldNodes,
             heights = heightOutput
         };
+        */
         ApplyHeightJob applyHeightJob = new ApplyHeightJob
         {
             meshOutput = vertexOperationArray,
-            heights = heightOutput,
-            nodes = fieldNodes
+            nodes = fieldNodes,
+            coefficient = heightStep
         };
         // Schedule all jobs in order.
         entropyJobHandle = entropyJob.Schedule(fieldNodes.Length, 64);
         neighborInfluenceHandle = neighborJob.Schedule(fieldNodes.Length, 64, entropyJobHandle);
         applyFlowHandle = applyFlowJob.Schedule(fieldNodes.Length, 64, neighborInfluenceHandle);
+        /*
         calculateHeightHandle = calculateHeightJob.Schedule(fieldNodes.Length, 64, applyFlowHandle);
-        applyHeightHandle = applyHeightJob.Schedule(fieldNodes.Length, 64, calculateHeightHandle);
+        */
+        applyHeightHandle = applyHeightJob.Schedule(fieldNodes.Length, 64, applyFlowHandle);
     }
     private void LateUpdate()
     {
-        neighborInfluenceHandle.Complete();
-        applyFlowHandle.Complete();
-        calculateHeightHandle.Complete();
         applyHeightHandle.Complete();
 
         vertexOperationArray.CopyTo(verticesJobOutput);
@@ -186,72 +189,67 @@ public sealed class FlowFieldFluid : MonoBehaviour
     {
         [ReadOnly] public Unity.Mathematics.Random random;
         [ReadOnly] public float deltaTime;
-        [ReadOnly] public float deltaEntropyAngle;
-        [ReadOnly] public float deltaEntropyMagnitude;
-        [ReadOnly] public float maxEntropyMagnitude;
         public NativeArray<FieldNode> nodes;
 
         public void Execute(int index)
         {
             FieldNode node = nodes[index];
-            node.entropyAngle += random.NextFloat(-1f, 1f) * deltaEntropyAngle * deltaTime;
-            node.entropyMagnitude += random.NextFloat(-1f, 1f) * deltaEntropyMagnitude * deltaTime;
-            node.entropyMagnitude =
-                math.clamp(node.entropyMagnitude, -maxEntropyMagnitude, maxEntropyMagnitude);
             nodes[index] = node;
         }
     }
     [BurstCompile]
-    private struct NeighborInfluenceJob : IJobParallelFor
+    private struct NeighborEnergyJob : IJobParallelFor
     {
         [ReadOnly] public float deltaTime;
         [ReadOnly] public int size;
         [ReadOnly] public float neighborFactor;
         [ReadOnly] public NativeArray<FieldNode> nodes;
-        [WriteOnly] public NativeArray<float2> influences;
+        [WriteOnly] public NativeArray<float> influences;
         public void Execute(int index)
         {
             FieldNode node = nodes[index];
-            float2 influence = float2.zero;
-            if (node.coordinate.x != 0)
-                influence += nodes[index - 1].flowDirection;
-            if (node.coordinate.x != size - 1)
-                influence += nodes[index + 1].flowDirection;
-            if (node.coordinate.y != 0)
-                influence += nodes[index - size].flowDirection;
-            if (node.coordinate.y != size - 1)
-                influence += nodes[index + size].flowDirection;
-            influence *= deltaTime * neighborFactor;
 
-            influence += deltaTime * new float2
-            {
-                x = math.cos(node.entropyAngle) * node.entropyMagnitude,
-                y = math.sin(node.entropyAngle) * node.entropyMagnitude
-            };
+            float leftHeight = node.coordinate.x != 0 ?
+                nodes[index - 1].height :
+                nodes[index - 1 + size].height;
+            float rightHeight = node.coordinate.x != size - 1 ?
+                nodes[index + 1].height :
+                nodes[index + 1 - size].height;
+            float downHeight = node.coordinate.y != 0 ?
+                nodes[index - size].height :
+                nodes[index - size + size * size].height;
+            float upHeight = node.coordinate.y != size - 1 ?
+                nodes[index + size].height :
+                nodes[index + size - size * size].height;
 
-            influences[index] = influence;
+            float heightDifference =
+                (leftHeight + rightHeight + downHeight + upHeight) / 4f
+                - node.height;
+
+            if (heightDifference > 1f)
+                influences[index] = deltaTime * neighborFactor;
+            else if (heightDifference < -1f)
+                influences[index] = -deltaTime * neighborFactor;
         }
     }
     [BurstCompile]
     private struct ApplyFlowJob : IJobParallelFor
     {
-        [ReadOnly] public NativeArray<float2> influence;
-        [ReadOnly] public float decay;
+        [ReadOnly] public NativeArray<float> influence;
         [ReadOnly] public float deltaTime;
+        [ReadOnly] public float neighborFactor;
         public NativeArray<FieldNode> nodes;
         public void Execute(int index)
         {
             // Apply new flow influences to the field.
             FieldNode node = nodes[index];
-            node.flowDirection += influence[index];
-            float magnitude = math.sqrt(node.flowDirection.x * node.flowDirection.x +
-                node.flowDirection.y * node.flowDirection.y);
 
-            if (magnitude > 0f)
-                node.flowDirection *= Mathf.Max(0f, (magnitude - deltaTime * decay) / magnitude);
+            node.height += influence[index];
+
             nodes[index] = node;
         }
     }
+    /*
     [BurstCompile]
     private struct CalculateHeightJob : IJobParallelFor
     {
@@ -277,25 +275,21 @@ public sealed class FlowFieldFluid : MonoBehaviour
             heights[index] = height;
         }
     }
+    */
     [BurstCompile]
     private struct ApplyHeightJob : IJobParallelFor
     {
         // Apply new flow heights to the field.
-        [ReadOnly] public NativeArray<float> heights;
         public NativeArray<FieldNode> nodes;
         public NativeArray<Vector3> meshOutput;
+        [ReadOnly] public float coefficient;
         public void Execute(int index)
         {
-            FieldNode node = nodes[index];
-            node.height = heights[index];
-            nodes[index] = node;
-
             Vector3 vert = meshOutput[index];
-            vert.y = heights[index];
+            vert.y = nodes[index].height * coefficient;
             meshOutput[index] = vert;
         }
     }
-
 
     /*
     public float GetElevation(Vector2 atLocation)

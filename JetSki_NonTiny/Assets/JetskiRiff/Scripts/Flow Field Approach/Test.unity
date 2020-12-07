@@ -175,7 +175,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 6c67e8a34c4b6484e8d87a3ad3f2eacb, type: 2}
+  - {fileID: 2100000, guid: 531eea3f869b86b4983b13a7ecc4f058, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -217,14 +217,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a68660247908eb4aa7835a4e0b29aac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  waveMagnitude: 0.5
-  deltaEntropyAngle: 30
-  deltaEntropyMagnitude: 30
-  maxEntropyMagnitude: 2.32
-  deltaFlowDecay: 3
-  fieldSize: 50
-  fieldStep: 0.25
-  neighborInfluence: 2
+  fieldSize: 200
+  fieldStep: 0.5
+  spreadRate: 5
+  noiseIntensity: 1
+  heightStep: 0.2
 --- !u!1 &255601659
 GameObject:
   m_ObjectHideFlags: 0
