@@ -12,13 +12,37 @@ public sealed class FlowFieldFluid : MonoBehaviour
         public int2 coordinate;
         public float height;
     }
-
-    private struct FlowOver
+    /// <summary>
+    /// Provides an implementation
+    /// for wrapping an index into the range
+    /// of a two-dimensional array.
+    /// </summary>
+    private struct IndexWrap2D
     {
-        public float left;
-        public float right;
-        public float top;
-        public float bottom;
+        public readonly int lengthX;
+        public readonly int lengthY;
+        public IndexWrap2D(int length)
+            : this(length, length) { }
+        public IndexWrap2D(int lengthX, int lengthY)
+        {
+            this.lengthX = lengthX;
+            this.lengthY = lengthY;
+        }
+        public int this[int x, int y]
+        {
+            get
+            {
+                while (x < 0)
+                    x += lengthX;
+                while (x > lengthX - 1)
+                    x -= lengthX;
+                while (y < 0)
+                    y += lengthY;
+                while (y > lengthY - 1)
+                    y -= lengthY;
+                return y * lengthX + x;
+            }
+        }
     }
 
 
@@ -27,7 +51,6 @@ public sealed class FlowFieldFluid : MonoBehaviour
     [SerializeField] private float spreadRate = 1f;
     [SerializeField] private float noiseIntensity = 1f;
     [SerializeField] private float heightStep = 1f;
-
     private void OnValidate()
     {
         if (noiseIntensity < 0f)
@@ -40,7 +63,8 @@ public sealed class FlowFieldFluid : MonoBehaviour
             spreadRate = 0f;
     }
 
-    // private Vector2 currentOrigin;
+    private IndexWrap2D wrap;
+
     private NativeArray<FieldNode> fieldNodes;
     private NativeArray<float> influenceOutput;
     private NativeArray<float> heightOutput;
@@ -48,10 +72,8 @@ public sealed class FlowFieldFluid : MonoBehaviour
     private NativeArray<Vector3> vertexOperationArray;
     private Vector3[] verticesJobOutput;
 
-    private JobHandle entropyJobHandle;
     private JobHandle neighborInfluenceHandle;
     private JobHandle applyFlowHandle;
-    private JobHandle calculateHeightHandle;
     private JobHandle applyHeightHandle;
 
     private Mesh dynamicMesh;
@@ -64,6 +86,7 @@ public sealed class FlowFieldFluid : MonoBehaviour
             startingHeights[i] = UnityEngine.Random.value * noiseIntensity;
             startingHeights[i + 1] = -startingHeights[i];
         }
+        wrap = new IndexWrap2D(fieldSize);
 
         // Generate the flow field nodes.
         // Get the starting corner to iterate from.
@@ -120,30 +143,31 @@ public sealed class FlowFieldFluid : MonoBehaviour
 
     private void Update()
     {
+        // TEST creates an impulse in the fluid body.
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            int centerIndex = fieldSize * (fieldSize / 2) + (fieldSize / 2);
-            for (int i = -9; i < 10; i++)
+            int2 center = new int2(fieldSize / 2, fieldSize / 2);
+            for (int x = -5; x <= 5; x++)
             {
-                FieldNode node = fieldNodes[centerIndex + i];
-                node.height = 95f;
-                fieldNodes[centerIndex + i] = node;
+                for (int y = -5; y <= 5; y++)
+                {
+                    int index =
+                        wrap[center.x + x, center.y + y];
+                    FieldNode node = fieldNodes[index];
+                    node.height -= 10f * Time.deltaTime;
+                    fieldNodes[index] = node;
+                }
             }
         }
 
-        UpdateEntropyJob entropyJob = new UpdateEntropyJob
-        {
-            random = new Unity.Mathematics.Random((uint)UnityEngine.Random.Range(0, int.MaxValue)),
-            deltaTime = Time.deltaTime,
-            nodes = fieldNodes
-        };
         NeighborEnergyJob neighborJob = new NeighborEnergyJob
         {
             deltaTime = Time.deltaTime,
             size = fieldSize,
             neighborFactor = spreadRate,
             nodes = fieldNodes,
-            influences = influenceOutput
+            influences = influenceOutput,
+            wrap = wrap
         };
         ApplyFlowJob applyFlowJob = new ApplyFlowJob
         {
@@ -152,15 +176,6 @@ public sealed class FlowFieldFluid : MonoBehaviour
             deltaTime = Time.deltaTime,
             nodes = fieldNodes
         };
-        /*
-        CalculateHeightJob calculateHeightJob = new CalculateHeightJob
-        {
-            size = fieldSize,
-            magnitude = waveMagnitude,
-            nodes = fieldNodes,
-            heights = heightOutput
-        };
-        */
         ApplyHeightJob applyHeightJob = new ApplyHeightJob
         {
             meshOutput = vertexOperationArray,
@@ -168,12 +183,8 @@ public sealed class FlowFieldFluid : MonoBehaviour
             coefficient = heightStep
         };
         // Schedule all jobs in order.
-        entropyJobHandle = entropyJob.Schedule(fieldNodes.Length, 64);
-        neighborInfluenceHandle = neighborJob.Schedule(fieldNodes.Length, 64, entropyJobHandle);
+        neighborInfluenceHandle = neighborJob.Schedule(fieldNodes.Length, 64);
         applyFlowHandle = applyFlowJob.Schedule(fieldNodes.Length, 64, neighborInfluenceHandle);
-        /*
-        calculateHeightHandle = calculateHeightJob.Schedule(fieldNodes.Length, 64, applyFlowHandle);
-        */
         applyHeightHandle = applyHeightJob.Schedule(fieldNodes.Length, 64, applyFlowHandle);
     }
     private void LateUpdate()
@@ -185,42 +196,26 @@ public sealed class FlowFieldFluid : MonoBehaviour
         dynamicMesh.RecalculateNormals();
     }
     [BurstCompile]
-    private struct UpdateEntropyJob : IJobParallelFor
-    {
-        [ReadOnly] public Unity.Mathematics.Random random;
-        [ReadOnly] public float deltaTime;
-        public NativeArray<FieldNode> nodes;
-
-        public void Execute(int index)
-        {
-            FieldNode node = nodes[index];
-            nodes[index] = node;
-        }
-    }
-    [BurstCompile]
     private struct NeighborEnergyJob : IJobParallelFor
     {
         [ReadOnly] public float deltaTime;
         [ReadOnly] public int size;
         [ReadOnly] public float neighborFactor;
         [ReadOnly] public NativeArray<FieldNode> nodes;
+        [ReadOnly] public IndexWrap2D wrap;
         [WriteOnly] public NativeArray<float> influences;
         public void Execute(int index)
         {
             FieldNode node = nodes[index];
 
-            float leftHeight = node.coordinate.x != 0 ?
-                nodes[index - 1].height :
-                nodes[index - 1 + size].height;
-            float rightHeight = node.coordinate.x != size - 1 ?
-                nodes[index + 1].height :
-                nodes[index + 1 - size].height;
-            float downHeight = node.coordinate.y != 0 ?
-                nodes[index - size].height :
-                nodes[index - size + size * size].height;
-            float upHeight = node.coordinate.y != size - 1 ?
-                nodes[index + size].height :
-                nodes[index + size - size * size].height;
+            float leftHeight =
+                nodes[wrap[node.coordinate.x - 1, node.coordinate.y]].height;
+            float rightHeight =
+                nodes[wrap[node.coordinate.x + 1, node.coordinate.y]].height;
+            float downHeight =
+                nodes[wrap[node.coordinate.x, node.coordinate.y - 1]].height;
+            float upHeight =
+                nodes[wrap[node.coordinate.x, node.coordinate.y + 1]].height;
 
             float heightDifference =
                 (leftHeight + rightHeight + downHeight + upHeight) / 4f

@@ -217,7 +217,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a68660247908eb4aa7835a4e0b29aac, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  fieldSize: 200
+  fieldSize: 250
   fieldStep: 0.5
   spreadRate: 5
   noiseIntensity: 1
