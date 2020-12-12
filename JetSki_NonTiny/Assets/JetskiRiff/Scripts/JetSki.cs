@@ -13,7 +13,7 @@ public sealed class JetSki : MonoBehaviour
     [Tooltip("The body that forces will be applied to.")]
     [SerializeField] private Rigidbody body = null;
     [Tooltip("The fluid that applies bouyancy to the jetski.")]
-    [SerializeField] private WaterBodyRenderer fluid = null;
+    [SerializeField] private FlowFieldFluid fluid = null;
     [Tooltip("The hull used to calculate bouyant forces.")]
     [SerializeField] private MeshFilter bouyancyHull = null;
     [Tooltip("Defines the location and direction of applied acceleration.")]
@@ -116,6 +116,7 @@ public sealed class JetSki : MonoBehaviour
             }
         }
 
+        /*
         if (body.velocity.magnitude > 2f)
         {
             fluid.AddWave(
@@ -123,6 +124,7 @@ public sealed class JetSki : MonoBehaviour
                 , Time.time, 0.02f * body.velocity.magnitude, 0.05f)
             );
         }
+        */
     }
     #endregion
 }
