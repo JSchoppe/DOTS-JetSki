@@ -4,14 +4,22 @@ using Unity.Collections;
 using Unity.Burst;
 using Unity.Mathematics;
 
+/// <summary>
+/// Simulated fluid surface that uses a flow field approach.
+/// </summary>
 public sealed class FlowFieldFluid : MonoBehaviour
 {
+    #region Flow Field Node Unit
     private struct FieldNode
     {
         public float2 location;
-        public int2 coordinate;
         public float height;
+        // This is stored so it does not need to recalculate
+        // every update cycle.
+        public int2 coordinate;
     }
+    #endregion
+    #region Index Wrap Struct (Embedded Implementation)
     /// <summary>
     /// Provides an implementation
     /// for wrapping an index into the range
@@ -28,6 +36,9 @@ public sealed class FlowFieldFluid : MonoBehaviour
             this.lengthX = lengthX;
             this.lengthY = lengthY;
         }
+        // Returns the index based on two dimensions given
+        // where external indices will be wrapped into
+        // internal indices.
         public int this[int x, int y]
         {
             get
@@ -44,7 +55,7 @@ public sealed class FlowFieldFluid : MonoBehaviour
             }
         }
     }
-
+    #endregion
 
     [SerializeField] private int fieldSize = 2;
     [SerializeField] private float fieldStep = 1f;
@@ -63,6 +74,7 @@ public sealed class FlowFieldFluid : MonoBehaviour
             spreadRate = 0f;
     }
 
+    private float2 startingCorner;
     private IndexWrap2D wrap;
 
     private NativeArray<FieldNode> fieldNodes;
@@ -86,11 +98,12 @@ public sealed class FlowFieldFluid : MonoBehaviour
             startingHeights[i] = UnityEngine.Random.value * noiseIntensity;
             startingHeights[i + 1] = -startingHeights[i];
         }
+        startingHeights.Shuffle();
         wrap = new IndexWrap2D(fieldSize);
 
         // Generate the flow field nodes.
         // Get the starting corner to iterate from.
-        float2 startingCorner = new float2
+        startingCorner = new float2
         {
             x = transform.position.x - ((fieldSize - 1) * fieldStep * 0.5f),
             y = transform.position.z - ((fieldSize - 1) * fieldStep * 0.5f)
@@ -244,33 +257,6 @@ public sealed class FlowFieldFluid : MonoBehaviour
             nodes[index] = node;
         }
     }
-    /*
-    [BurstCompile]
-    private struct CalculateHeightJob : IJobParallelFor
-    {
-        [ReadOnly] public int size;
-        [ReadOnly] public float magnitude;
-        [ReadOnly] public NativeArray<FieldNode> nodes;
-        [WriteOnly] public NativeArray<float> heights;
-        public void Execute(int index)
-        {
-            FieldNode node = nodes[index];
-            float height = 0f;
-
-            if (node.coordinate.x != 0)
-                height += nodes[index - 1].flowDirection.x;
-            if (node.coordinate.x != size - 1)
-                height -= nodes[index + 1].flowDirection.x;
-            if (node.coordinate.y != 0)
-                height += nodes[index - size].flowDirection.y;
-            if (node.coordinate.y != size - 1)
-                height -= nodes[index + size].flowDirection.y;
-
-            height *= magnitude;
-            heights[index] = height;
-        }
-    }
-    */
     [BurstCompile]
     private struct ApplyHeightJob : IJobParallelFor
     {
@@ -286,12 +272,33 @@ public sealed class FlowFieldFluid : MonoBehaviour
         }
     }
 
-    /*
     public float GetElevation(Vector2 atLocation)
     {
+        Vector2 indexLocation =
+            (atLocation + (Vector2)startingCorner) / fieldStep;
 
+        int xLeftIndex = Mathf.FloorToInt(indexLocation.x);
+        int xRightIndex = Mathf.CeilToInt(indexLocation.x);
+        int yDownIndex = Mathf.FloorToInt(indexLocation.y);
+        int yUpIndex = Mathf.CeilToInt(indexLocation.y);
+
+        float leftWeight = Mathf.Max(indexLocation.x - xLeftIndex, 0f);
+        float rightWeight = Mathf.Max(xRightIndex - indexLocation.x, 0f);
+        float downWeight = Mathf.Max(indexLocation.y - yDownIndex, 0f);
+        float upWeight = Mathf.Max(yUpIndex - indexLocation.y, 0f);
+        float totalWeight = leftWeight + rightWeight + downWeight + upWeight;
+        leftWeight /= totalWeight;
+        rightWeight /= totalWeight;
+        downWeight /= totalWeight;
+        upWeight /= totalWeight;
+
+        return heightStep * 0.5f * (
+            (leftWeight + downWeight) * fieldNodes[wrap[xLeftIndex, yDownIndex]].height +
+            (leftWeight + upWeight) * fieldNodes[wrap[xLeftIndex, yUpIndex]].height +
+            (rightWeight + upWeight) * fieldNodes[wrap[xRightIndex, yUpIndex]].height +
+            (rightWeight + downWeight) * fieldNodes[wrap[xRightIndex, yDownIndex]].height
+        );
     }
-    */
 
     public void ApplyImpulse(Vector2 atLocation, float magnitude)
     {
