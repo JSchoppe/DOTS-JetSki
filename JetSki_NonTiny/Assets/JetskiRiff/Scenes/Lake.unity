@@ -678,11 +678,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   fishCount: 5000
+  spawnRadius: 10
   scale: {x: 0.9, y: 1.1}
   speed: {x: 3, y: 7}
   wander: {x: 4, y: 10}
   depthWander: {x: 0, y: 8}
-  waterBody: {fileID: 0}
 --- !u!4 &1105233577
 Transform:
   m_ObjectHideFlags: 0
@@ -815,7 +815,7 @@ MonoBehaviour:
   fieldStep: 0.5
   spreadRate: 5
   noiseIntensity: 1
-  heightStep: 0.3
+  heightStep: 0.2
 --- !u!4 &1499343228
 Transform:
   m_ObjectHideFlags: 0
@@ -919,7 +919,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1653805388}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c9139f039b8ff664cb85b32b1d925694, type: 3}
   m_Name: 

@@ -7,33 +7,47 @@ using Unity.Transforms;
 /// </summary>
 public sealed class FishSystem : SystemBase
 {
+    public Translation LocationToAvoid;
+
     protected override void OnUpdate()
     {
         // Define loop constants.
         float dt = Time.DeltaTime;
         float t = (float)Time.ElapsedTime;
         Random rand = new Random((uint)UnityEngine.Random.Range(0, int.MaxValue));
+        float3 avoid = LocationToAvoid.Value;
         // Process each entity.
-        Entities.ForEach((ref LocalToWorld localToWorld, ref FishComponent fish, in WaveComponent wave) =>
+        Entities.ForEach((ref LocalToWorld localToWorld, ref FishComponent fish) =>
         {
-            float time = t * wave.ambientFlowSpeed;
-            float waveHeight = wave.WaveHeightAt(localToWorld.Position.TrimY(), time);
-
-            fish.depth = ((noise.snoise(new float2(time, 0f)) + 1f) / 2f) * fish.depthWanderMagnitude;
+            fish.depth = ((noise.snoise(new float3(t, localToWorld.Position.x, localToWorld.Position.z) * 0.005f) + 1f) / 2f) * fish.depthWanderMagnitude;
 
             float3 heightAdjustedPosition = new float3
             {
                 x = localToWorld.Position.x,
-                y = waveHeight - fish.depth,
+                y = - fish.depth,
                 z = localToWorld.Position.z
             };
 
-            // Get the direction to the current target.
-            float3 direction = math.normalize(new float3
+            float3 direction;
+            // If the fish is near the avoided location,
+            // swim away from it.
+            if (math.distancesq(localToWorld.Position.TrimY(), avoid.TrimY()) < 90f)
             {
-                x = fish.target.x - heightAdjustedPosition.x,
-                z = fish.target.z - heightAdjustedPosition.z,
-            });
+                direction = math.normalize(new float3
+                {
+                    x = heightAdjustedPosition.x - avoid.x,
+                    z = heightAdjustedPosition.z - avoid.z,
+                });
+            }
+            else
+            {
+                // Get the direction to the current target.
+                direction = math.normalize(new float3
+                {
+                    x = fish.target.x - heightAdjustedPosition.x,
+                    z = fish.target.z - heightAdjustedPosition.z,
+                });
+            }
             // Apply the new matrix data to the fish.
             localToWorld = new LocalToWorld
             {

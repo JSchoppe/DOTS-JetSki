@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using Unity.Mathematics;
+using Unity.Entities;
 
 /// <summary>
 /// Controller for the JetSki hull.
@@ -61,6 +62,8 @@ public sealed class JetSki : MonoBehaviour
     #region MonoBehaviour - Update Camera
     private void Update()
     {
+        World.DefaultGameObjectInjectionWorld.GetExistingSystem<FishSystem>().LocationToAvoid.Value
+            = transform.position;
         // Update the camera positioning to follow the jetski.
         cameraRig.transform.position = new Vector3
         {
@@ -125,6 +128,7 @@ public sealed class JetSki : MonoBehaviour
             );
         }
         */
+        fluid.Center = new Vector2(transform.position.x, transform.position.z);
     }
     #endregion
 }

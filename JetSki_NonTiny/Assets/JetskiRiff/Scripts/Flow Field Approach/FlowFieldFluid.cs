@@ -88,10 +88,29 @@ public sealed class FlowFieldFluid : MonoBehaviour
     private JobHandle applyFlowHandle;
     private JobHandle applyHeightHandle;
 
+    public Vector2 Center
+    {
+        set
+        {
+            xStep = (int)(value.x / fieldStep);
+            yStep = (int)(value.y / fieldStep);
+            transform.position = new Vector3
+            {
+                x = xStep * fieldStep,
+                y = transform.position.y,
+                z = yStep * fieldStep
+            };
+        }
+    }
+    private int xStep;
+    private int yStep;
+
     private Mesh dynamicMesh;
 
     private void Awake()
     {
+        Center = Vector2.zero;
+
         float[] startingHeights = new float[fieldSize * fieldSize];
         for (int i = 0; i < startingHeights.Length - 1; i += 2)
         {
@@ -105,8 +124,8 @@ public sealed class FlowFieldFluid : MonoBehaviour
         // Get the starting corner to iterate from.
         startingCorner = new float2
         {
-            x = transform.position.x - ((fieldSize - 1) * fieldStep * 0.5f),
-            y = transform.position.z - ((fieldSize - 1) * fieldStep * 0.5f)
+            x = -(fieldSize - 1) * fieldStep * 0.5f,
+            y = -(fieldSize - 1) * fieldStep * 0.5f
         };
         // Generate the nodes in a grid pattern.
         FieldNode[] nodes = new FieldNode[fieldSize * fieldSize];
@@ -193,7 +212,10 @@ public sealed class FlowFieldFluid : MonoBehaviour
         {
             meshOutput = vertexOperationArray,
             nodes = fieldNodes,
-            coefficient = heightStep
+            coefficient = heightStep,
+            stepX = xStep,
+            stepY = yStep,
+            wrap = wrap
         };
         // Schedule all jobs in order.
         neighborInfluenceHandle = neighborJob.Schedule(fieldNodes.Length, 64);
@@ -261,13 +283,17 @@ public sealed class FlowFieldFluid : MonoBehaviour
     private struct ApplyHeightJob : IJobParallelFor
     {
         // Apply new flow heights to the field.
-        public NativeArray<FieldNode> nodes;
+        [ReadOnly] public NativeArray<FieldNode> nodes;
         public NativeArray<Vector3> meshOutput;
         [ReadOnly] public float coefficient;
+        [ReadOnly] public int stepX;
+        [ReadOnly] public int stepY;
+        [ReadOnly] public IndexWrap2D wrap;
         public void Execute(int index)
         {
             Vector3 vert = meshOutput[index];
-            vert.y = nodes[index].height * coefficient;
+            int wrappedIndex = wrap[nodes[index].coordinate.x + stepY, nodes[index].coordinate.y + stepX];
+            vert.y = nodes[wrappedIndex].height * coefficient;
             meshOutput[index] = vert;
         }
     }
@@ -302,6 +328,16 @@ public sealed class FlowFieldFluid : MonoBehaviour
 
     public void ApplyImpulse(Vector2 atLocation, float magnitude)
     {
+        // Wrap the location into the bounds of the flow field.
+        while (atLocation.x > fieldSize * fieldStep * 0.5f)
+            atLocation.x += fieldSize * fieldStep;
+        while (atLocation.x < -fieldSize * fieldStep * 0.5f)
+            atLocation.x -= fieldSize * fieldStep;
+        while (atLocation.y > fieldSize * fieldStep * 0.5f)
+            atLocation.y += fieldSize * fieldStep;
+        while (atLocation.y < -fieldSize * fieldStep * 0.5f)
+            atLocation.y -= fieldSize * fieldStep;
+
 
     }
 }
